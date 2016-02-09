@@ -13,7 +13,7 @@ namespace now
     //    _digits.push_back(0);
   }
 
-  BigInt::BigInt ( int64_t num )
+  BigInt::BigInt ( int64_t num ) : _positive ( true )
   {
     std::string num_str = std::to_string ( num );
     if ( num < 0 ) {
@@ -25,9 +25,10 @@ namespace now
           it++) {
       _digits.push_back ( *it - '0' );
     }
+    //std::cout << " ctor int " << *this << std::endl;
   }
 
-  BigInt::BigInt ( std::string num )
+  BigInt::BigInt ( std::string num ) : _positive ( true )
   {
     if ( num[0] == '-' ) {
       num.erase(0,1);
@@ -44,7 +45,7 @@ namespace now
     _digits ( other._digits ),
     _positive ( other._positive )
   {
-    //    std::cout << "BigInt copy constructor " << std::endl;
+    //std::cout << "BigInt copy constructor " << *this <<std::endl;
   }
 
   BigInt & BigInt::operator= ( const BigInt & other )
@@ -112,14 +113,19 @@ namespace now
   {
     uint32_t temp;
     bool carry = false;
-    bool switch_sign = false;
+    bool negate = false;
     /* Do the easy case first this > rhs */
 
-    auto rhs_it = rhs._digits.begin ( ) ;
-    auto it     = _digits.begin ( );
-
-    while ( rhs_it != rhs._digits.end ( ) ) {
-      int8_t temp = *it;
+    BigInt left(*this);
+    BigInt right(rhs);
+    if ( left < right ) {
+      negate = true;
+      std::swap (left, right );
+    }
+    auto rhs_it = right._digits.begin ( ) ;
+    auto it     = left._digits.begin ( );
+    while ( rhs_it != right._digits.end ( ) ) {
+      uint32_t  temp = *it;
       if ( carry ) temp--;
       if ( *it < *rhs_it ) {
         carry = true;
@@ -131,7 +137,7 @@ namespace now
       }
       it++; rhs_it++;
     }
-    while ( carry && it != _digits.end() ) {
+    while ( carry && it != left._digits.end() ) {
       if ( *it == 0 ) {
         *it = 9;
       } else {
@@ -142,11 +148,12 @@ namespace now
    }
     /* Remove leading zeros */
     while ( true ) {
-      it =  _digits.end ( ) - 1;
+      it =  left._digits.end ( ) - 1;
       if ( *it != 0 ) break;
-      _digits.pop_back ( );
+      left._digits.pop_back ( );
     }
-    if ( switch_sign ) _positive = !_positive;
+    std::swap ( left, *this );
+    if ( negate ) _positive = false;
     return *this ;
   }
 
@@ -191,12 +198,11 @@ namespace now
       }
       digit--;
       result += cpy;
-      //std::cout << "After multiplying by " << (uint32_t)*it << " the current result is " << result << std::endl;
+
     }
     std::swap ( result, *this );
     return * this;
   }
-
 
   /* Binary operators */
   /* Non-member functions are below here */
@@ -212,6 +218,10 @@ namespace now
   bool operator < ( const BigInt &lhs, const BigInt &rhs )
   {
     if ( &lhs == &rhs ) return false;  /* These are the same */
+    /* if lhs is negate and rhs is positive lhs < rhs */
+    if ( lhs.isNegative ( ) && !( rhs.isNegative ( ) ) ) return true;
+    /* if lhs isPositive and rhs is negative  rhs < lhs */
+    if ( !(lhs.isNegative ( ) ) && rhs.isNegative ( )  ) return false;
 
     if ( lhs._digits.size () < rhs._digits.size() ) return true;
     if ( lhs._digits.size () > rhs._digits.size() ) return false;
@@ -255,6 +265,7 @@ namespace now
   std::ostream & operator<< ( std::ostream & out , const BigInt & big )
   {
     /* by default uint8_t == char which prints ascii value*/
+    if (!big._positive) out << "-";
     for ( auto it = big._digits.crbegin ( );
           it != big._digits.crend();
           it++) {
