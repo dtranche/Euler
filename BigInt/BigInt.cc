@@ -65,6 +65,7 @@ namespace now
     _positive = !(_positive);
     return *this;
   }
+
   const BigInt & BigInt::operator+= ( const BigInt & rhs )
   {
     uint32_t temp;
@@ -72,7 +73,24 @@ namespace now
 
     if ( !rhs.num_digits ( ) ) return *this;
     /* TODO handle a += a */
-
+    if ( *this == rhs ) return *this *= 2;
+    /* If they have different signs we can call subtraction instead */
+    if ( _positive != rhs.isPositive( ) ) {
+      std::cout << "Switching to subtraction " << std::endl;
+      /* Adding a negative to a positive */
+      if ( _positive  ) {
+        BigInt temp(rhs);
+        *this -= (-temp);
+        return *this;
+      } else {
+        /* this is negative and rhs is positive, negate this (lhs),  and call subtract */
+        BigInt left(rhs);
+        BigInt right(*this);
+        -(right);
+        *this = ( left - right );
+        return * this;
+      }
+    }
     auto it = _digits.begin ();
     auto rhs_it = rhs._digits.begin ();
     while ( !( it == _digits.end () || rhs_it == rhs._digits.end ( ) ) ){
@@ -111,10 +129,25 @@ namespace now
 
   const BigInt & BigInt::operator-= ( const BigInt & rhs )
   {
+    if ( !rhs.num_digits ( ) ) return *this;
+
+    /* If they are both negative just add them */
+    if ( !_positive && rhs.isNegative ( ) ) return (*this += rhs );
+
+    /* Subtracting a negative from a positive, just add them */
+    if ( _positive  && rhs.isNegative( ) ) {
+      BigInt temp(rhs);
+      return (*this += -temp );
+    }
+
+    if  ( *this == rhs ) {
+      _digits.clear ();
+      _positive = true;
+      return *this;
+    }
     uint32_t temp;
     bool carry = false;
     bool negate = false;
-    /* Do the easy case first this > rhs */
 
     BigInt left(*this);
     BigInt right(rhs);
@@ -122,6 +155,7 @@ namespace now
       negate = true;
       std::swap (left, right );
     }
+
     auto rhs_it = right._digits.begin ( ) ;
     auto it     = left._digits.begin ( );
     while ( rhs_it != right._digits.end ( ) ) {
@@ -214,9 +248,17 @@ namespace now
     return temp;
   }
 
+  BigInt operator-( const BigInt & lhs, const BigInt & rhs )
+  {
+    BigInt temp ( lhs );
+    temp -= rhs;
+    return temp;
+  }
+
   /* Relational operators  */
   bool operator < ( const BigInt &lhs, const BigInt &rhs )
   {
+
     if ( &lhs == &rhs ) return false;  /* These are the same */
     /* if lhs is negate and rhs is positive lhs < rhs */
     if ( lhs.isNegative ( ) && !( rhs.isNegative ( ) ) ) return true;
@@ -230,7 +272,6 @@ namespace now
     /* At this point the sizes are the same */
     while ( lhs_it !=  lhs._digits.crend() ) {
       if (*lhs_it < *rhs_it ) return true;
-      if (*lhs_it < *rhs_it ) return false;
       ++lhs_it; ++rhs_it;
     }
     /* same number */
